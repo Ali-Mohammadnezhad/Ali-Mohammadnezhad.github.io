@@ -6,8 +6,8 @@
  * glowing action potentials down their axons, so activity cascades across the
  * network. Moving the mouse excites nearby neurons.
  *
- * Colors follow the site's theme (--global-theme-color, --global-text-color-light)
- * and adapt to light/dark mode. Respects "reduce motion" system settings.
+ * Sparks are shiny white; the network uses the site's text color and adapts
+ * to light/dark mode. Respects "reduce motion" system settings.
  */
 (() => {
   // ---------- Settings you can tweak ----------
@@ -58,7 +58,7 @@
     if (c[0] === "#") return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
     return c.match(/[\d.]+/g).slice(0, 3).map(Number);
   }
-  let col = {}, dark = false, glow = null, lastThemeKey = "";
+  let col = {}, dark = false, glow = null, star = null, lastThemeKey = "";
   function readTheme() {
     const cs = getComputedStyle(root);
     const theme = cs.getPropertyValue("--global-theme-color").trim();
@@ -71,22 +71,55 @@
     col.cell = toRGB(cell, "#828282");
     const b = toRGB(bg, "#ffffff");
     dark = 0.299 * b[0] + 0.587 * b[1] + 0.114 * b[2] < 128;
-    glow = makeGlow(col.theme);
+    col.lit = dark ? [255, 255, 255] : [90, 90, 105]; // color of active axons/somata
+    glow = makeGlow(dark);
+    star = makeStar(dark);
   }
   const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
-  // Pre-rendered glowing sprite for spikes (much faster than shadowBlur)
-  function makeGlow(c) {
+  // Pre-rendered sprites for spikes (much faster than shadowBlur).
+  // Sparks are shiny white; on light backgrounds they get a soft grey halo
+  // so the white stays visible.
+  function makeGlow(isDark) {
     const s = 64, g = document.createElement("canvas");
     g.width = g.height = s;
     const gc = g.getContext("2d");
     const grad = gc.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    grad.addColorStop(0, "rgba(255,255,255,1)");
-    grad.addColorStop(0.15, rgba(c, 1));
-    grad.addColorStop(0.45, rgba(c, 0.35));
-    grad.addColorStop(1, rgba(c, 0));
+    if (isDark) {
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.2, "rgba(255,255,255,0.9)");
+      grad.addColorStop(0.5, "rgba(220,235,255,0.25)");
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+    } else {
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.18, "rgba(255,255,255,1)");
+      grad.addColorStop(0.3, "rgba(120,120,140,0.6)");
+      grad.addColorStop(0.6, "rgba(120,120,140,0.18)");
+      grad.addColorStop(1, "rgba(150,150,170,0)");
+    }
     gc.fillStyle = grad;
     gc.fillRect(0, 0, s, s);
+    return g;
+  }
+  // Glint: glow plus a four-pointed star flare, used for spike heads
+  function makeStar(isDark) {
+    const s = 64, g = document.createElement("canvas");
+    g.width = g.height = s;
+    const gc = g.getContext("2d");
+    gc.drawImage(makeGlow(isDark), 0, 0);
+    const ray = (horizontal) => {
+      const lg = horizontal
+        ? gc.createLinearGradient(0, 0, s, 0)
+        : gc.createLinearGradient(0, 0, 0, s);
+      lg.addColorStop(0, "rgba(255,255,255,0)");
+      lg.addColorStop(0.5, "rgba(255,255,255,1)");
+      lg.addColorStop(1, "rgba(255,255,255,0)");
+      gc.fillStyle = lg;
+      if (horizontal) gc.fillRect(0, s / 2 - 1, s, 2);
+      else gc.fillRect(s / 2 - 1, 0, 2, s);
+    };
+    ray(true);
+    ray(false);
     return g;
   }
 
@@ -205,8 +238,8 @@
 
     // Axons (brighter while a spike is travelling along them)
     for (const ax of axons) {
-      const a = CFG.axonAlpha + ax.lit * 0.22;
-      ctx.strokeStyle = ax.lit > 0.02 ? rgba(col.theme, a) : rgba(col.cell, CFG.axonAlpha);
+      const a = CFG.axonAlpha + ax.lit * 0.25;
+      ctx.strokeStyle = ax.lit > 0.02 ? rgba(col.lit, a) : rgba(col.cell, CFG.axonAlpha);
       ctx.lineWidth = 0.8 + ax.lit * 0.6;
       ctx.beginPath();
       ctx.moveTo(ax.from.x, ax.from.y);
@@ -216,7 +249,7 @@
 
     // Dendrites + somata
     for (const n of neurons) {
-      const c = n.flash > 0.05 ? col.theme : col.cell;
+      const c = n.flash > 0.05 ? col.lit : col.cell;
       const a = CFG.cellAlpha * (dark ? 0.75 : 1) + n.flash * 0.5;
       ctx.strokeStyle = rgba(c, a * 0.8);
       for (const [x1, y1, x2, y2, depth] of n.dend) {
@@ -237,7 +270,7 @@
     for (const n of neurons) {
       if (n.flash > 0.05) {
         const s = 26 + n.flash * 30;
-        ctx.globalAlpha = n.flash * (dark ? 0.9 : 0.6);
+        ctx.globalAlpha = n.flash * (dark ? 0.9 : 0.8);
         ctx.drawImage(glow, n.x - s / 2, n.y - s / 2, s, s);
       }
     }
@@ -246,9 +279,9 @@
         const t = sp.t - k * 0.025;
         if (t < 0) break;
         const [x, y] = bez(sp.ax, t);
-        const s = 18 - k * 3;
-        ctx.globalAlpha = (1 - k / 5) * (dark ? 1 : 0.75);
-        ctx.drawImage(glow, x - s / 2, y - s / 2, s, s);
+        const s = k === 0 ? 30 : 16 - k * 2.5;
+        ctx.globalAlpha = (1 - k / 5) * (k === 0 ? 1 : 0.8);
+        ctx.drawImage(k === 0 ? star : glow, x - s / 2, y - s / 2, s, s);
       }
     }
     ctx.globalAlpha = 1;
