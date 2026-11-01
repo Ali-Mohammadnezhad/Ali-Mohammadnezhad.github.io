@@ -14,10 +14,10 @@
   const CFG = {
     density: 1 / 11000, // neurons per pixel² of screen
     minNeurons: 35,
-    maxNeurons: 150,
+    maxNeurons: 5000,
     connectRadius: 230, // max axon length (px)
-    maxTargets: 3, // outgoing axons per neuron
-    spontaneousRate: 0.06,  // random firings per neuron per second
+    maxTargets: 1000, // outgoing axons per neuron
+    spontaneousRate: 0.06, // random firings per neuron per second
     leak: 1.6, // how fast membrane potential decays (per second)
     refractory: 0.7, // seconds a neuron can't fire after a spike
     spikeSpeed: [110, 220], // px per second (min, max)
@@ -46,8 +46,12 @@
   document.body.prepend(canvas);
   const ctx = canvas.getContext("2d");
 
-  let W = 0, H = 0, DPR = 1;
-  let neurons = [], axons = [], spikes = [];
+  let W = 0,
+    H = 0,
+    DPR = 1;
+  let neurons = [],
+    axons = [],
+    spikes = [];
 
   // ---------- Theme colors ----------
   const probe = document.createElement("canvas").getContext("2d");
@@ -56,9 +60,16 @@
     probe.fillStyle = color || fallback;
     const c = probe.fillStyle; // normalized: "#rrggbb" or "rgba(...)"
     if (c[0] === "#") return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
-    return c.match(/[\d.]+/g).slice(0, 3).map(Number);
+    return c
+      .match(/[\d.]+/g)
+      .slice(0, 3)
+      .map(Number);
   }
-  let col = {}, dark = false, glow = null, star = null, lastThemeKey = "";
+  let col = {},
+    dark = false,
+    glow = null,
+    star = null,
+    lastThemeKey = "";
   function readTheme() {
     const cs = getComputedStyle(root);
     const theme = cs.getPropertyValue("--global-theme-color").trim();
@@ -81,7 +92,8 @@
   // Sparks are shiny white; on light backgrounds they get a soft grey halo
   // so the white stays visible.
   function makeGlow(isDark) {
-    const s = 64, g = document.createElement("canvas");
+    const s = 64,
+      g = document.createElement("canvas");
     g.width = g.height = s;
     const gc = g.getContext("2d");
     const grad = gc.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
@@ -103,14 +115,13 @@
   }
   // Glint: glow plus a four-pointed star flare, used for spike heads
   function makeStar(isDark) {
-    const s = 64, g = document.createElement("canvas");
+    const s = 64,
+      g = document.createElement("canvas");
     g.width = g.height = s;
     const gc = g.getContext("2d");
     gc.drawImage(makeGlow(isDark), 0, 0);
     const ray = (horizontal) => {
-      const lg = horizontal
-        ? gc.createLinearGradient(0, 0, s, 0)
-        : gc.createLinearGradient(0, 0, 0, s);
+      const lg = horizontal ? gc.createLinearGradient(0, 0, s, 0) : gc.createLinearGradient(0, 0, 0, s);
       lg.addColorStop(0, "rgba(255,255,255,0)");
       lg.addColorStop(0.5, "rgba(255,255,255,1)");
       lg.addColorStop(1, "rgba(255,255,255,0)");
@@ -134,7 +145,8 @@
       grow(n.x, n.y, rand(0, Math.PI * 2), rand(10, 22), 2);
     }
     function grow(x, y, ang, len, depth) {
-      const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+      const x2 = x + Math.cos(ang) * len,
+        y2 = y + Math.sin(ang) * len;
       segs.push([x, y, x2, y2, depth]);
       if (depth > 0) {
         const k = Math.random() < 0.7 ? 2 : 1;
@@ -156,7 +168,8 @@
     let tries = 0;
     while (neurons.length < N && tries < N * 40) {
       tries++;
-      const x = rand(20, W - 20), y = rand(20, H - 20);
+      const x = rand(20, W - 20),
+        y = rand(20, H - 20);
       if (neurons.some((n) => (n.x - x) ** 2 + (n.y - y) ** 2 < minD * minD)) continue;
       const n = { x, y, r: rand(2.2, 4.2), v: rand(0, 0.6), refr: 0, flash: 0, out: [] };
       n.dend = makeDendrites(n);
@@ -174,13 +187,18 @@
       const k = Math.min(near.length, Math.floor(rand(1, CFG.maxTargets + 1)));
       for (let i = 0; i < k; i++) {
         const { b, d } = near.splice(Math.floor(Math.random() * near.length), 1)[0];
-        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-        const nx = -(b.y - a.y) / d, ny = (b.x - a.x) / d; // perpendicular
+        const mx = (a.x + b.x) / 2,
+          my = (a.y + b.y) / 2;
+        const nx = -(b.y - a.y) / d,
+          ny = (b.x - a.x) / d; // perpendicular
         const bend = rand(-0.35, 0.35) * d;
         const ax = {
-          from: a, to: b,
-          cx: mx + nx * bend, cy: my + ny * bend,
-          len: d, w: rand(0.45, 0.9), // synaptic weight
+          from: a,
+          to: b,
+          cx: mx + nx * bend,
+          cy: my + ny * bend,
+          len: d,
+          w: rand(0.45, 0.9), // synaptic weight
           lit: 0,
         };
         axons.push(ax);
@@ -191,10 +209,7 @@
 
   function bez(ax, t) {
     const u = 1 - t;
-    return [
-      u * u * ax.from.x + 2 * u * t * ax.cx + t * t * ax.to.x,
-      u * u * ax.from.y + 2 * u * t * ax.cy + t * t * ax.to.y,
-    ];
+    return [u * u * ax.from.x + 2 * u * t * ax.cx + t * t * ax.to.x, u * u * ax.from.y + 2 * u * t * ax.cy + t * t * ax.to.y];
   }
 
   // ---------- Dynamics ----------
@@ -290,7 +305,8 @@
 
   // ---------- Sizing ----------
   function resize(force) {
-    const w = window.innerWidth, h = window.innerHeight;
+    const w = window.innerWidth,
+      h = window.innerHeight;
     // Ignore small height changes (mobile address bar) to avoid rebuilding
     if (!force && w === W && Math.abs(h - H) < 150) return;
     DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -309,14 +325,18 @@
   });
 
   // ---------- Mouse interaction ----------
-  window.addEventListener("pointermove", (e) => {
-    if (reduceMotion) return;
-    const R2 = CFG.mouseRadius ** 2;
-    for (const n of neurons) {
-      const d2 = (n.x - e.clientX) ** 2 + (n.y - e.clientY) ** 2;
-      if (d2 < R2) n.v += 0.06 * (1 - d2 / R2);
-    }
-  }, { passive: true });
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      if (reduceMotion) return;
+      const R2 = CFG.mouseRadius ** 2;
+      for (const n of neurons) {
+        const d2 = (n.x - e.clientX) ** 2 + (n.y - e.clientY) ** 2;
+        if (d2 < R2) n.v += 0.06 * (1 - d2 / R2);
+      }
+    },
+    { passive: true }
+  );
 
   // Re-read colors when light/dark mode is toggled
   new MutationObserver(() => {
