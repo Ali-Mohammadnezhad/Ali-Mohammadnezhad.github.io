@@ -25,4 +25,4 @@ My research asks how recurrent processing shapes visual representations along th
 ventral visual stream. I build biologically plausible neural network models of vision
 and compare their representations with human brain data from MEG and EEG.
 
-<script src="{{ '/assets/js/neurons.js' | relative_url }}" defer></script>
+
